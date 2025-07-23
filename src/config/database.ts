@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import { Logger } from '../utils/logger';
+import '../models/audit-log.model';
+import '../models/license.model';
+import '../models/usage-event.model';
 
 const logger = new Logger('Database');
 export const connectDatabase = async (): Promise<void> => {
@@ -18,6 +21,11 @@ export const connectDatabase = async (): Promise<void> => {
     await mongoose.connect(MONGODB_URI, options);
     
     logger.info('Connected to MongoDB successfully');
+    
+    // Force all models to initialize and create indexes
+    for (const modelName of mongoose.modelNames()) {
+      await mongoose.model(modelName).init();
+    }
     
     // Handle connection events
     mongoose.connection.on('error', (err) => {

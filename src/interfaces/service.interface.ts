@@ -79,11 +79,12 @@ export interface ILicenseService {
   getLicense(id: string): Promise<License | null>;
   
   /**
-   * Get all licenses
+   * Get all licenses with pagination
    * @param filter Optional filter
-   * @returns Array of licenses
+   * @param options Pagination options (skip, limit)
+   * @returns Paginated result with licenses and total count
    */
-  getAllLicenses(filter?: Partial<License>): Promise<License[]>;
+  getAllLicenses(filter?: Partial<License>, options?: { skip?: number; limit?: number }): Promise<{ licenses: License[]; total: number; page: number; limit: number; totalPages: number; }>;
   
   /**
    * Update a license

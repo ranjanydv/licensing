@@ -16,11 +16,11 @@ export const generateLicense = catchAsync(async (req: Request, res: Response) =>
         // Validate request body
         const licenseData = validate(licenseRequestSchema, req.body) as LicenseRequest;
 
+
         // Set createdBy from authenticated user (if not provided)
         if (!licenseData.createdBy) {
             licenseData.createdBy = req.body.userId || 'system';
         }
-
         // Generate license
         const license = await licenseService.generateLicense(licenseData);
 
@@ -36,7 +36,7 @@ export const generateLicense = catchAsync(async (req: Request, res: Response) =>
             throw error;
         }
 
-        logger.error('Error generating license:', {error});
+        logger.error('Error generating license:', { error });
         throw new AppError(`Failed to generate license: ${(error as Error).message}`, 400);
     }
 });
@@ -46,16 +46,24 @@ export const generateLicense = catchAsync(async (req: Request, res: Response) =>
  * @route GET /api/licenses
  */
 export const getLicenses = catchAsync(async (req: Request, res: Response) => {
-    // Extract filter parameters from query
-    const { status, schoolId } = req.query;
+    const { status, schoolId, page = 1, limit = 20, search } = req.query;
 
     // Build filter object
     const filter: Record<string, any> = {};
     if (status) filter.status = status;
     if (schoolId) filter.schoolId = schoolId;
 
-    // Get licenses
-    const licenses = await licenseService.getAllLicenses(filter);
+    if (search) {
+        filter.schoolName = { $regex: search, $options: 'i' };
+    }
+
+    // Pagination
+    const pageNum = Math.max(Number(page) || 1, 1);
+    const limitNum = Math.max(Number(limit) || 20, 1);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get paginated licenses and total count
+    const { licenses, total } = await licenseService.getAllLicenses(filter, { skip, limit: limitNum });
 
     // Return success response
     res.status(200).json({
@@ -63,7 +71,11 @@ export const getLicenses = catchAsync(async (req: Request, res: Response) => {
         results: licenses.length,
         data: {
             licenses
-        }
+        },
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
     });
 });
 

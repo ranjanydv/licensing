@@ -5,7 +5,6 @@ import express from 'express';
 import helmet from 'helmet';
 import path from 'path';
 import { connectDatabase } from './config/database';
-import { setupCronJobs } from './cron';
 import { errorHandler } from './middlewares/errorHandler';
 import { apiLimiter } from './middlewares/rateLimiter';
 import analyticsRoutes from './routes/analytics.routes';
@@ -13,8 +12,9 @@ import featureRoutes from './routes/feature.routes';
 import licenseRoutes from './routes/licenseRoutes';
 import securityRoutes from './routes/securityRoutes';
 import { Logger } from './utils/logger';
-import { customCss, specs } from './config/swagger';
-import swaggerUi from 'swagger-ui-express';
+// import { customCss, specs } from './config/swagger';
+// import swaggerUi from 'swagger-ui-express';
+// import { stopAllCronJobs } from './cron';
 
 // Load environment variables
 dotenv.config();
@@ -86,7 +86,6 @@ const startServer = async () => {
       logger.info(`${signal} received. Shutting down gracefully...`);
       
       // Stop all cron jobs
-      // const { stopAllCronJobs } = require('./cron');
       // stopAllCronJobs();
       // logger.info('Cron jobs stopped');
       

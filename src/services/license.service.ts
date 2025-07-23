@@ -430,12 +430,22 @@ export class LicenseService implements ILicenseService {
   }
 
   /**
-   * Get all licenses
+   * Get all licenses with pagination
    * @param filter Optional filter
-   * @returns Array of licenses
+   * @param options Pagination options (skip, limit)
+   * @returns Paginated result with licenses and total count
    */
-  async getAllLicenses(filter?: Partial<License>): Promise<License[]> {
-    return licenseRepository.findAll(filter);
+  async getAllLicenses(filter: Partial<License> = {}, options: { skip?: number; limit?: number } = {}): Promise<{ licenses: License[]; total: number; page: number; limit: number; totalPages: number; }> {
+    const page = options.skip && options.limit ? Math.floor(options.skip / options.limit) + 1 : 1;
+    const limit = options.limit || 20;
+    const result = await licenseRepository.findWithPagination(filter, page, limit);
+    return {
+      licenses: result.items,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+      totalPages: result.totalPages
+    };
   }
 
   /**

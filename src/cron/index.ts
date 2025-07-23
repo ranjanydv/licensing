@@ -108,13 +108,13 @@ export const generateExpirationReport = async (): Promise<void> => {
       expiresAt: thirtyDaysFromNow
     } as any); // Using 'as any' to bypass TypeScript's type checking for MongoDB queries
     
-    logger.info(`Found ${expiringLicenses.length} licenses expiring in the next 30 days`);
+    logger.info(`Found ${expiringLicenses.licenses.length} licenses expiring in the next 30 days`);
     
     // In a real system, you would send this report via email or store it
     // For now, we just log it
-    if (expiringLicenses.length > 0) {
+    if (expiringLicenses.licenses.length > 0) {
       logger.info('Expiring licenses:', {
-        licenses: expiringLicenses.map(license => ({
+        licenses: expiringLicenses.licenses.map(license => ({
           id: license._id,
           schoolId: license.schoolId,
           schoolName: license.schoolName,

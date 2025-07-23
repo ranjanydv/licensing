@@ -282,7 +282,7 @@ export const specs = swaggerJsdoc(options);
 export const markdownDocs = getMarkdownDocs();
 
 // Generate HTML documentation
-export const docsHtml = generateSwaggerHtml(markdownDocs);
+export const docsHtml = generateSwaggerHtml(markdownDocs as any);
 
 // Export custom CSS
 export const customCss = swaggerCustomCss;

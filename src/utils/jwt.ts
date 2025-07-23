@@ -14,24 +14,40 @@ const logger = new Logger('JWT');
 export const generateToken = (payload: JWTPayload): string => {
   try {
     const secret = process.env.JWT_SECRET as Secret;
-    
+
     if (!secret) {
       throw new Error('JWT_SECRET is not defined in environment variables');
     }
-    
+
     let expiresIn: string | number = process.env.JWT_EXPIRES_IN || '30d';
     if (typeof expiresIn === 'string' && !isNaN(Number(expiresIn))) {
       expiresIn = Number(expiresIn);
     }
-    const options: SignOptions = {
-      expiresIn: expiresIn as any
-    };
-    return jwt.sign(payload, secret, options);
+
+    // Check if payload already has exp claim
+    const options: SignOptions = {};
+
+    if (!payload.exp) {
+      options.expiresIn = expiresIn as any;
+
+    }
+
+    const token = jwt.sign(payload, secret, options);
+    return token;
   } catch (error) {
-    logger.error('Error generating JWT token:', { error });
+    logger.error('Error generating JWT token:', {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : 'Unknown',
+      errorStack: error instanceof Error ? error.stack : 'No stack trace',
+      payload: payload,
+      jwtSecretExists: !!process.env.JWT_SECRET,
+      jwtExpiresIn: process.env.JWT_EXPIRES_IN
+    });
+
     throw new AppError('Failed to generate license token', 500);
   }
 };
+
 
 /**
  * Verify a JWT token
@@ -41,11 +57,11 @@ export const generateToken = (payload: JWTPayload): string => {
 export const verifyToken = (token: string): JWTPayload => {
   try {
     const secret = process.env.JWT_SECRET;
-    
+
     if (!secret) {
       throw new Error('JWT_SECRET is not defined in environment variables');
     }
-    
+
     return jwt.verify(token, secret) as JWTPayload;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
