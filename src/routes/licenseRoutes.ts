@@ -309,7 +309,8 @@ router.put('/:id', authenticate, authorize(['admin']), updateLicense);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.delete('/:id', authenticate, authorize(['admin']), revokeLicense);
+// router.delete('/:id', authenticate, authorize(['admin']), revokeLicense);
+router.delete('/:id',  revokeLicense);
 
 /**
  * @swagger

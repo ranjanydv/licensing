@@ -1,27 +1,22 @@
-import { License, LicenseRequest, ValidationResult, LicenseStatus, LicenseCheckReport, JWTPayload, Feature, SecurityRestrictions } from '../interfaces/license.interface';
-import { ILicenseService } from '../interfaces/service.interface';
-import { licenseRepository } from '../repositories/license.repository';
-import { generateToken, verifyToken } from '../utils/jwt';
-import { generateLicenseHash, verifyLicenseHash, generateHardwareFingerprint, generateRandomLicenseKey } from '../utils/hash';
-import { Logger } from '../utils/logger';
-import { AppError, LicenseError } from '../middlewares/errorHandler';
-import { Document } from 'mongoose';
-import { notificationService, AlertSeverity } from './notification.service';
-import { auditService } from './audit.service';
-import { AuditActionType } from '../models/audit-log.model';
-import { hasFeature, meetsRestriction, validateFeature, validateFeatures, FeatureValidationResult } from '../utils/featureValidation';
-import { AnalyticsService } from './analytics.service';
-import { AnalyticsRepository } from '../repositories/analytics.repository';
-import { UsageEventType } from '../interfaces/analytics.interface';
-import {
-  generateLicenseFingerprint,
-  validateSecurityRestrictions,
-  ClientInfo,
-  HardwareInfo,
-  SecurityValidationResult,
-  verifyLicenseFingerprint
-} from '../utils/security';
 import mongoose from 'mongoose';
+import { JWTPayload, License, LicenseCheckReport, LicenseRequest, LicenseStatus, ValidationResult } from '../interfaces/license.interface';
+import { ILicenseService } from '../interfaces/service.interface';
+import { AppError, LicenseError } from '../middlewares/errorHandler';
+import { AuditActionType } from '../models/audit-log.model';
+import { AnalyticsRepository } from '../repositories/analytics.repository';
+import { licenseRepository } from '../repositories/license.repository';
+import { FeatureValidationResult, hasFeature, meetsRestriction, validateFeature, validateFeatures } from '../utils/featureValidation';
+import { generateHardwareFingerprint, generateLicenseHash, generateRandomLicenseKey } from '../utils/hash';
+import { generateToken, verifyToken } from '../utils/jwt';
+import { Logger } from '../utils/logger';
+import {
+  ClientInfo,
+  generateLicenseFingerprint,
+  HardwareInfo
+} from '../utils/security';
+import { AnalyticsService } from './analytics.service';
+import { auditService } from './audit.service';
+import { AlertSeverity, notificationService } from './notification.service';
 
 
 /**
@@ -360,34 +355,54 @@ export class LicenseService implements ILicenseService {
    * @param updatedBy User who revoked the license
    * @returns True if revoked, false if not found
    */
-  async revokeLicense(id: string, updatedBy: string): Promise<boolean> {
+  async revokeLicense(idOrKey: string, updatedBy: string): Promise<boolean> {
+    let license = null;
     try {
-      this.logger.info('Revoking license', { licenseId: id });
-
-      // Get existing license
-      const existingLicense = await licenseRepository.findById(id);
-      if (!existingLicense) {
+      if (mongoose.Types.ObjectId.isValid(idOrKey)) {
+        license = await licenseRepository.findById(idOrKey);
+      }
+      if (!license) {
+        license = await licenseRepository.findByLicenseKey(idOrKey);
+      }
+      if (!license) {
+        // Not found is not an error, just return false
         return false;
       }
 
+      // Check if license is already revoked
+      if (license.status === LicenseStatus.REVOKED) {
+        // Use a more specific error for already revoked
+        throw new LicenseError('License already revoked', 'LICENSE_ALREADY_REVOKED', 400);
+      }
+
       // Update license status to revoked
-      const updatedLicense = await licenseRepository.update(id, {
+      const updatedLicense = await licenseRepository.update(license._id.toString(), {
         status: LicenseStatus.REVOKED,
         updatedBy
       });
 
       if (!updatedLicense) {
-        throw new AppError('Failed to revoke license', 500);
+        // This should be rare, but treat as not found
+        throw new LicenseError('License not found for revocation', 'LICENSE_NOT_FOUND', 404);
       }
 
       // Send notification about revoked license
-      await notificationService.notifyLicenseRevocation(updatedLicense);
+      try {
+        await notificationService.notifyLicenseRevocation(updatedLicense);
+      } catch (notifyError) {
+        this.logger.warn('Failed to send license revocation notification', { licenseId: license._id, error: notifyError });
+        // Do not fail the whole operation if notification fails
+      }
 
-      this.logger.info('License revoked successfully', { licenseId: id });
+      this.logger.info('License revoked successfully', { licenseId: license._id });
       return true;
     } catch (error) {
+      // If already a LicenseError or AppError, rethrow as is
+      if (error instanceof LicenseError || error instanceof AppError) {
+        throw error;
+      }
       this.logger.error('Error revoking license:', { error });
-      throw new AppError(`Failed to revoke license: ${(error as Error).message}`, 500);
+      throw new AppError('Failed to revoke license', 500);
     }
   }
 
@@ -1065,7 +1080,7 @@ export class LicenseService implements ILicenseService {
       if (!license) {
         return { blacklisted: false };
       }
-      
+
       return {
         blacklisted: !!license.blacklisted,
         reason: license.blacklisted ? license.blacklistReason : undefined
