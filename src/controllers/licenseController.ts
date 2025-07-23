@@ -16,7 +16,6 @@ export const generateLicense = catchAsync(async (req: Request, res: Response) =>
         // Validate request body
         const licenseData = validate(licenseRequestSchema, req.body) as LicenseRequest;
 
-
         // Set createdBy from authenticated user (if not provided)
         if (!licenseData.createdBy) {
             licenseData.createdBy = req.body.userId || 'system';
@@ -24,11 +23,19 @@ export const generateLicense = catchAsync(async (req: Request, res: Response) =>
         // Generate license
         const license = await licenseService.generateLicense(licenseData);
 
-        // Return success response
         res.status(201).json({
             status: 'success',
             data: {
-                license
+                license: {
+                    licenseKey: license.licenseKey,
+                    expiresAt: license.expiresAt,
+                    features: license.features.filter(f => f.enabled).map(f => f.name),
+                    schoolId: license.schoolId,
+                    schoolName: license.schoolName,
+                    status: license.status,
+                    issuedAt: license.issuedAt,
+                    metadata: license.metadata
+                }
             }
         });
     } catch (error) {

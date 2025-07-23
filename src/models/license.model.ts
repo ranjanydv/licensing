@@ -99,7 +99,11 @@ const LicenseSchema = new Schema<License & Document>({
 	licenseKey: {
 		type: String,
 		required: true,
-		index: true // Index for faster lookups by license key
+		index: true
+	},
+	licenseToken: {
+		type: String,
+		required: true,
 	},
 	licenseHash: {
 		type: String,

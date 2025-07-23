@@ -43,7 +43,8 @@ export interface License {
 	_id: string;
 	schoolId: string;
 	schoolName: string;
-	licenseKey: string; // JWT token
+	licenseKey: string; // Short, random, public-facing license key (e.g., UUID or base62 string)
+	licenseToken: string; // JWT or secure token for internal validation
 	licenseHash: string; // Additional hash for verification
 	features: Feature[];
 	issuedAt: Date;

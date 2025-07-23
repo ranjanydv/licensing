@@ -11,11 +11,11 @@ const logger = new Logger('Cron');
 export const activeCronJobs = new Map<string, cron.ScheduledTask>();
 
 // Store failed tasks for retry mechanism
-export const failedTasks = new Map<string, { 
-  taskName: string, 
-  failCount: number, 
-  lastError: Error, 
-  lastAttempt: Date 
+export const failedTasks = new Map<string, {
+  taskName: string,
+  failCount: number,
+  lastError: Error,
+  lastAttempt: Date
 }>();
 
 // Maximum retry attempts before alerting administrators
@@ -29,10 +29,10 @@ export const checkLicenses = async (): Promise<LicenseCheckReport> => {
   const taskName = 'dailyLicenseCheck';
   try {
     logger.info('Running daily license check');
-    
+
     // Check all licenses
     const report = await licenseService.checkLicenses();
-    
+
     // Log report summary
     logger.info('License check completed', {
       totalChecked: report.totalChecked,
@@ -41,21 +41,21 @@ export const checkLicenses = async (): Promise<LicenseCheckReport> => {
       revoked: report.revoked,
       failed: report.failed
     });
-    
+
     // Clear from failed tasks if it was previously failed
     if (failedTasks.has(taskName)) {
       failedTasks.delete(taskName);
       logger.info(`Task ${taskName} recovered successfully`);
     }
-    
+
     return report;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Error in daily license check:', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined });
-    
+
     // Track failed task for retry
     recordFailedTask(taskName, error as Error);
-    
+
     throw error;
   }
 };
@@ -68,26 +68,26 @@ export const retryFailedChecks = async (): Promise<number> => {
   const taskName = 'retryFailedChecks';
   try {
     logger.info('Retrying failed license checks');
-    
+
     // Retry failed checks
     const retriedCount = await licenseService.retryFailedChecks();
-    
+
     logger.info(`Retried ${retriedCount} failed license checks`);
-    
+
     // Clear from failed tasks if it was previously failed
     if (failedTasks.has(taskName)) {
       failedTasks.delete(taskName);
       logger.info(`Task ${taskName} recovered successfully`);
     }
-    
+
     return retriedCount;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Error in retry failed checks:', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined });
-    
+
     // Track failed task for retry
     recordFailedTask(taskName, error as Error);
-    
+
     throw error;
   }
 };
@@ -100,18 +100,17 @@ export const generateExpirationReport = async (): Promise<void> => {
   const taskName = 'expirationReport';
   try {
     logger.info('Generating license expiration report');
-    
+
     // Get licenses expiring in the next 30 days
     const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const expiringLicenses = await licenseService.getAllLicenses({
       status: LicenseStatus.ACTIVE,
       expiresAt: thirtyDaysFromNow
-    } as any); // Using 'as any' to bypass TypeScript's type checking for MongoDB queries
-    
+    } as any);
+
     logger.info(`Found ${expiringLicenses.licenses.length} licenses expiring in the next 30 days`);
-    
-    // In a real system, you would send this report via email or store it
-    // For now, we just log it
+
+    // TODO: Store expiring licenses in a report or send notifications
     if (expiringLicenses.licenses.length > 0) {
       logger.info('Expiring licenses:', {
         licenses: expiringLicenses.licenses.map(license => ({
@@ -122,7 +121,7 @@ export const generateExpirationReport = async (): Promise<void> => {
         }))
       });
     }
-    
+
     // Clear from failed tasks if it was previously failed
     if (failedTasks.has(taskName)) {
       failedTasks.delete(taskName);
@@ -131,7 +130,7 @@ export const generateExpirationReport = async (): Promise<void> => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('Error generating expiration report:', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined });
-    
+
     // Track failed task for retry
     recordFailedTask(taskName, error as Error);
   }
@@ -144,20 +143,20 @@ export const generateExpirationReport = async (): Promise<void> => {
  */
 export const recordFailedTask = (taskName: string, error: Error): void => {
   const now = new Date();
-  
+
   // Check if task has failed before
   if (failedTasks.has(taskName)) {
     const failedTask = failedTasks.get(taskName)!;
     failedTask.failCount += 1;
     failedTask.lastError = error;
     failedTask.lastAttempt = now;
-    
+
     // Alert administrators if max retry attempts reached
     if (failedTask.failCount >= MAX_RETRY_ATTEMPTS) {
-      const severity = failedTask.failCount >= MAX_RETRY_ATTEMPTS * 2 
-        ? AlertSeverity.HIGH 
+      const severity = failedTask.failCount >= MAX_RETRY_ATTEMPTS * 2
+        ? AlertSeverity.HIGH
         : AlertSeverity.MEDIUM;
-      
+
       notificationService.sendAdminAlert(
         `Task ${taskName} has failed ${failedTask.failCount} times. Last error: ${error.message}`,
         severity
@@ -172,9 +171,9 @@ export const recordFailedTask = (taskName: string, error: Error): void => {
       lastAttempt: now
     });
   }
-  
-  logger.warn(`Task ${taskName} failed and added to retry queue`, { 
-    failCount: failedTasks.get(taskName)!.failCount 
+
+  logger.warn(`Task ${taskName} failed and added to retry queue`, {
+    failCount: failedTasks.get(taskName)!.failCount
   });
 };
 
@@ -189,9 +188,9 @@ export const executeCronTask = async (taskName: string, taskFn: () => Promise<an
     await taskFn();
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(`Error in scheduled task ${taskName}:`, { 
-      error: errorMessage, 
-      stack: error instanceof Error ? error.stack : undefined 
+    logger.error(`Error in scheduled task ${taskName}:`, {
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
     });
   }
 };
@@ -205,12 +204,12 @@ export const manualRetryFailedTasks = async (): Promise<void> => {
     logger.info('No failed tasks to retry');
     return;
   }
-  
+
   logger.info(`Manually retrying ${failedTasks.size} failed tasks`);
-  
+
   for (const [taskName, failedTask] of failedTasks.entries()) {
     logger.info(`Retrying failed task: ${taskName}`);
-    
+
     try {
       switch (taskName) {
         case 'dailyLicenseCheck':
@@ -227,9 +226,9 @@ export const manualRetryFailedTasks = async (): Promise<void> => {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error(`Manual retry of task ${taskName} failed:`, { 
-        error: errorMessage, 
-        stack: error instanceof Error ? error.stack : undefined 
+      logger.error(`Manual retry of task ${taskName} failed:`, {
+        error: errorMessage,
+        stack: error instanceof Error ? error.stack : undefined
       });
     }
   }
@@ -246,11 +245,11 @@ export const setupCronJobs = (): void => {
     scheduled: true,
     timezone: 'UTC' // Use UTC for consistency across deployments
   });
-  
+
   // Retry failed checks
   const retryFailedChecksJob = cron.schedule(cronConfig.retryFailedChecks, async () => {
     await executeCronTask('retryFailedChecks', retryFailedChecks);
-    
+
     // Also retry any other failed tasks
     if (failedTasks.size > 0) {
       logger.info(`Found ${failedTasks.size} failed tasks to retry`);
@@ -260,7 +259,7 @@ export const setupCronJobs = (): void => {
     scheduled: true,
     timezone: 'UTC'
   });
-  
+
   // Generate expiration report
   const expirationReportJob = cron.schedule(cronConfig.expirationReport, async () => {
     await executeCronTask('expirationReport', generateExpirationReport);
@@ -268,12 +267,12 @@ export const setupCronJobs = (): void => {
     scheduled: true,
     timezone: 'UTC'
   });
-  
+
   // Store active jobs for management
   activeCronJobs.set('dailyLicenseCheck', dailyLicenseCheckJob);
   activeCronJobs.set('retryFailedChecks', retryFailedChecksJob);
   activeCronJobs.set('expirationReport', expirationReportJob);
-  
+
   logger.info('Cron jobs scheduled successfully', {
     jobs: Array.from(activeCronJobs.keys())
   });
@@ -288,7 +287,7 @@ export const stopAllCronJobs = (): void => {
     job.stop();
     logger.info(`Stopped cron job: ${name}`);
   }
-  
+
   activeCronJobs.clear();
   logger.info('All cron jobs stopped');
 };
@@ -305,10 +304,10 @@ export const getCronJobsStatus = (): Array<{
   failCount: number;
 }> => {
   const status = [];
-  
+
   for (const [name, job] of activeCronJobs.entries()) {
     const failedTask = failedTasks.get(name);
-    
+
     status.push({
       name,
       nextRun: null, // node-cron does not support next run time
@@ -317,7 +316,7 @@ export const getCronJobsStatus = (): Array<{
       failCount: failedTask?.failCount || 0
     });
   }
-  
+
   return status;
 };
 

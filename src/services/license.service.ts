@@ -2,7 +2,7 @@ import { License, LicenseRequest, ValidationResult, LicenseStatus, LicenseCheckR
 import { ILicenseService } from '../interfaces/service.interface';
 import { licenseRepository } from '../repositories/license.repository';
 import { generateToken, verifyToken } from '../utils/jwt';
-import { generateLicenseHash, verifyLicenseHash, generateHardwareFingerprint } from '../utils/hash';
+import { generateLicenseHash, verifyLicenseHash, generateHardwareFingerprint, generateRandomLicenseKey } from '../utils/hash';
 import { Logger } from '../utils/logger';
 import { AppError, LicenseError } from '../middlewares/errorHandler';
 import { Document } from 'mongoose';
@@ -21,6 +21,7 @@ import {
   SecurityValidationResult,
   verifyLicenseFingerprint
 } from '../utils/security';
+import mongoose from 'mongoose';
 
 
 /**
@@ -140,6 +141,9 @@ export class LicenseService implements ILicenseService {
       // Generate license hash
       const licenseHash = generateLicenseHash(licenseDataWithDates);
 
+      // Generate a short, random, public-facing license key
+      const licenseKey = generateRandomLicenseKey();
+
       // Create JWT payload with security info
       const jwtPayload: JWTPayload = {
         sub: licenseData.schoolId,
@@ -157,27 +161,26 @@ export class LicenseService implements ILicenseService {
         }
       };
 
-      // Generate JWT token
-      const licenseKey = generateToken(jwtPayload);
-
-      // Create license in database
+      // Create license in database (licenseToken will be added after _id is known)
+      const licenseId = new mongoose.Types.ObjectId();
+      const licenseToken = generateToken(jwtPayload);
       const license = await licenseRepository.create({
+        _id: licenseId,
         ...licenseDataWithDates,
         licenseKey,
-        licenseHash
+        licenseHash,
+        licenseToken,
       });
 
       // Generate license fingerprint for tamper detection
       const fingerprint = generateLicenseFingerprint(license);
 
-      // Update JWT payload with license ID and regenerate token
-      jwtPayload.licenseId = license._id.toString();
+      // Update JWT payload with license ID and fingerprint, then generate token
+      jwtPayload.licenseId = licenseId.toString();
       jwtPayload.securityInfo!.fingerprint = fingerprint;
-      const updatedLicenseKey = generateToken(jwtPayload);
 
-      // Update license with new token and fingerprint
-      const updatedLicense = await licenseRepository.update(license._id.toString(), {
-        licenseKey: updatedLicenseKey,
+      const updatedLicense = await licenseRepository.update(licenseId.toString(), {
+        licenseToken,
         fingerprint
       });
 
@@ -198,7 +201,7 @@ export class LicenseService implements ILicenseService {
 
   /**
    * Validate a license
-   * @param licenseKey License key (JWT token)
+   * @param licenseKey License key (short, public-facing key)
    * @param schoolId School ID
    * @param checkRevocation Whether to check revocation status
    * @param clientInfo Client information for security validation
@@ -207,216 +210,38 @@ export class LicenseService implements ILicenseService {
   async validateLicense(licenseKey: string, schoolId: string, checkRevocation = true, clientInfo?: ClientInfo): Promise<ValidationResult> {
     try {
       this.logger.info('Validating license', { schoolId });
-      let payload: JWTPayload | undefined;
-      try {
-        payload = verifyToken(licenseKey);
-      } catch (error) {
-        if (payload?.licenseId) {
-          analyticsService.trackLicenseValidation(
-            payload.licenseId,
-            schoolId,
-            false,
-            { error: (error as Error).message },
-            clientInfo
-          ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-        }
-        return {
-          valid: false,
-          errors: [(error as Error).message]
-        };
-      }
-
-      if (payload.sub !== schoolId) {
-        analyticsService.trackLicenseValidation(
-          payload.licenseId,
-          schoolId,
-          false,
-          { error: 'License does not match school ID' },
-          clientInfo
-        ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-        return {
-          valid: false,
-          errors: ['License does not match school ID']
-        };
-      }
-
-      // Check if license exists in database
+      // Lookup license by short licenseKey
       const license = await licenseRepository.findByLicenseKey(licenseKey);
       if (!license) {
-        analyticsService.trackLicenseValidation(
-          payload.licenseId,
-          schoolId,
-          false,
-          { error: 'License not found in database' },
-          clientInfo
-        ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-        return {
-          valid: false,
-          errors: ['License not found in database']
-        };
+        return { valid: false, errors: ['License not found'] };
       }
-
-      // Verify license hash
-      const isHashValid = verifyLicenseHash(license, license.licenseHash);
-      if (!isHashValid) {
-        analyticsService.trackLicenseValidation(
-          license._id.toString(),
-          schoolId,
-          false,
-          { error: 'License hash verification failed' },
-          clientInfo
-        ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-        return {
-          valid: false,
-          errors: ['License hash verification failed']
-        };
+      // Validate schoolId matches
+      if (license.schoolId !== schoolId) {
+        return { valid: false, errors: ['School ID does not match'] };
       }
-
-      // Check if license is blacklisted
-      if (license.blacklisted) {
-        analyticsService.trackLicenseValidation(
-          license._id.toString(),
-          schoolId,
-          false,
-          { error: `License is blacklisted: ${license.blacklistReason || 'No reason provided'}` },
-          clientInfo
-        ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-        return {
-          valid: false,
-          errors: [`License is blacklisted: ${license.blacklistReason || 'No reason provided'}`]
-        };
+      // Validate JWT token (licenseToken)
+      try {
+        verifyToken(license.licenseToken);
+      } catch (err) {
+        return { valid: false, errors: [(err as Error).message] };
       }
-
-      // Verify license fingerprint if available
-      if (license.fingerprint) {
-        const isFingerprintValid = verifyLicenseFingerprint(license);
-        if (!isFingerprintValid) {
-          analyticsService.trackLicenseValidation(
-            license._id.toString(),
-            schoolId,
-            false,
-            { error: 'License fingerprint verification failed, possible tampering detected' },
-            clientInfo
-          ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-          return {
-            valid: false,
-            errors: ['License fingerprint verification failed, possible tampering detected']
-          };
-        }
+      // Check expiration
+      if (license.expiresAt < new Date()) {
+        return { valid: false, errors: ['License has expired'] };
       }
-
-      // Check if license is active
-      if (license.status !== LicenseStatus.ACTIVE) {
-        analyticsService.trackLicenseValidation(
-          license._id.toString(),
-          schoolId,
-          false,
-          { error: `License is ${license.status}` },
-          clientInfo
-        ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-        return {
-          valid: false,
-          errors: [`License is ${license.status}`]
-        };
+      // Check blacklist/revocation
+      if (checkRevocation && license.blacklisted) {
+        return { valid: false, errors: ['License is blacklisted', license.blacklistReason || ''] };
       }
-
-      // Check if license has expired
-      const now = new Date();
-      if (license.expiresAt < now) {
-        // Update license status to expired
-        await licenseRepository.updateStatus(license._id.toString(), LicenseStatus.EXPIRED);
-
-        // Track failed validation
-        analyticsService.trackLicenseValidation(
-          license._id.toString(),
-          schoolId,
-          false,
-          { error: 'License has expired' },
-          clientInfo
-        ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-
-        return {
-          valid: false,
-          errors: ['License has expired']
-        };
-      }
-
-      // Validate security restrictions if present
-      if (license.securityRestrictions) {
-        // Get current device count for this license (would be implemented in a real system)
-        const currentDeviceCount = await this.getDeviceCountForLicense(license._id.toString());
-
-        // Validate all security restrictions
-        const securityResult = validateSecurityRestrictions(license, clientInfo, currentDeviceCount);
-
-        if (!securityResult.valid) {
-          // Track failed validation
-          analyticsService.trackLicenseValidation(
-            license._id.toString(),
-            schoolId,
-            false,
-            { error: securityResult.errors.join(', ') },
-            clientInfo
-          ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-
-          return {
-            valid: false,
-            errors: securityResult.errors
-          };
-        }
-
-        // If hardware binding is enabled and this is a new device, register it
-        if (
-          license.securityRestrictions.hardwareBinding?.enabled &&
-          clientInfo?.hardwareInfo &&
-          license.securityRestrictions.hardwareBinding.fingerprints.length === 0
-        ) {
-          await this.registerHardwareFingerprint(license._id.toString(), clientInfo.hardwareInfo);
-        }
-      }
-
-      // Check revocation status if requested
-      if (checkRevocation) {
-        // Update last checked timestamp
-        await licenseRepository.update(license._id.toString(), {
-          lastChecked: new Date()
-        });
-      }
-
-      // Calculate days until expiration
-      const daysUntilExpiration = Math.ceil(
-        (license.expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-
-      // Track successful validation
-      analyticsService.trackLicenseValidation(
-        license._id.toString(),
-        schoolId,
-        true,
-        { daysUntilExpiration },
-        clientInfo
-      ).catch(err => this.logger.error('Failed to track license validation', { error: err }));
-
+      // All checks passed
       return {
         valid: true,
-        license,
-        expiresIn: daysUntilExpiration
+        license: license as License,
+        expiresIn: Math.ceil((license.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       };
     } catch (error) {
       this.logger.error('Error validating license:', { error });
-      if (typeof schoolId === 'string') {
-        analyticsService.trackEvent({
-          licenseId: 'unknown',
-          schoolId,
-          eventType: UsageEventType.ERROR,
-          eventData: { error: (error as Error).message, context: 'license_validation' },
-          clientInfo
-        }).catch(err => this.logger.error('Failed to track error event', { error: err }));
-      }
-      return {
-        valid: false,
-        errors: [(error as Error).message]
-      };
+      return { valid: false, errors: [(error as Error).message] };
     }
   }
 
