@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 import { Logger } from '../utils/logger';
+import '../models/user.model';
+import '../models/role.model';
+import '../models/token-blacklist.model';
 import '../models/audit-log.model';
 import '../models/license.model';
 import '../models/usage-event.model';

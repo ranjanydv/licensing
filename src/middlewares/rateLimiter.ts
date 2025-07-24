@@ -55,6 +55,16 @@ export const licenseGenerationLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for authentication endpoints
+ * Strict limits to prevent brute force attacks
+ */
+export const authLimiter = createRateLimiter(
+	10,
+	15,
+	'Too many authentication attempts, please try again later'
+);
+
+/**
  * General API rate limiter
  */
 export const apiLimiter = createRateLimiter();

@@ -9,7 +9,8 @@ import {
   transferLicense
 } from '../controllers/licenseController';
 import { licenseValidationLimiter, licenseGenerationLimiter } from '../middlewares/rateLimiter';
-import { authenticate, authorize } from '../middlewares/auth';
+import { authenticate } from '../middlewares/authMiddleware';
+import { authorize } from '../middlewares/authorizationMiddleware';
 
 const router = express.Router();
 
@@ -126,8 +127,8 @@ router.post('/validate', licenseValidationLimiter, validateLicense);
  *       429:
  *         $ref: '#/components/responses/TooManyRequestsError'
  */
-// router.post('/', authenticate, authorize(['admin']), licenseGenerationLimiter, generateLicense);
-router.post('/', licenseGenerationLimiter, generateLicense);
+router.post('/', authenticate, authorize(['admin']), licenseGenerationLimiter, generateLicense);
+// router.post('/', licenseGenerationLimiter, generateLicense);
 
 /**
  * @swagger
@@ -214,7 +215,8 @@ router.get('/', getLicenses);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.get('/:id', authenticate, authorize(['admin', 'support']), getLicenseById);
+// router.get('/:id', authenticate, authorize(['admin', 'support']), getLicenseById);
+router.get('/:id', getLicenseById);
 
 /**
  * @swagger

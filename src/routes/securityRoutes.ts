@@ -8,7 +8,8 @@ import {
   removeFromBlacklist,
   checkBlacklistStatus
 } from '../controllers/securityController';
-import { authenticate, authorize } from '../middlewares/auth';
+import { authenticate } from '../middlewares/authMiddleware';
+import { authorize } from '../middlewares/authorizationMiddleware';
 
 const router = express.Router();
 
