@@ -21,7 +21,6 @@ export class AuthService implements IAuthService {
   private readonly refreshTokenSecret: Secret;
   private readonly accessTokenExpiry: string;
   private readonly refreshTokenExpiry: string;
-  private readonly saltRounds: number;
 
   constructor() {
     // Load configuration from environment variables
@@ -29,7 +28,6 @@ export class AuthService implements IAuthService {
     this.refreshTokenSecret = (process.env.JWT_REFRESH_SECRET || 'refresh_secret') as Secret;
     this.accessTokenExpiry = process.env.JWT_ACCESS_EXPIRES || '15m';
     this.refreshTokenExpiry = process.env.JWT_REFRESH_EXPIRES || '7d';
-    this.saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 
     // Validate configuration
     if (this.accessTokenSecret === 'access_secret' || this.refreshTokenSecret === 'refresh_secret') {
