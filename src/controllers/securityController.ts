@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { catchAsync, LicenseError } from '../middlewares/errorHandler';
 import { licenseService } from '../services/license.service';
 import { Logger } from '../utils/logger';
+import { AuthRequest } from '@/interfaces/auth.interface';
 
 // Validation schemas using zod
 const hardwareFingerprintSchema = z.object({
@@ -161,7 +162,7 @@ export const updateDeviceLimit = catchAsync(async (req: Request, res: Response) 
  * Blacklist a license
  * @route POST /api/licenses/:id/blacklist
  */
-export const blacklistLicense = catchAsync(async (req: Request, res: Response) => {
+export const blacklistLicense = catchAsync(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 
   // Validate request body
@@ -169,7 +170,8 @@ export const blacklistLicense = catchAsync(async (req: Request, res: Response) =
   const reason = validatedBody.reason;
 
   // Get updatedBy from authenticated user
-  const updatedBy = req.body.userId || 'system';
+  const updatedBy = req.user?.id || 'system';
+
 
   // Blacklist license
   const license = await licenseService.blacklistLicense(id, reason, updatedBy);
@@ -194,11 +196,11 @@ export const blacklistLicense = catchAsync(async (req: Request, res: Response) =
  * Remove a license from blacklist
  * @route DELETE /api/licenses/:id/blacklist
  */
-export const removeFromBlacklist = catchAsync(async (req: Request, res: Response) => {
+export const removeFromBlacklist = catchAsync(async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 
   // Get updatedBy from authenticated user
-  const updatedBy = req.body.userId || 'system';
+  const updatedBy = req.user?.id || 'system';
 
   // Remove from blacklist
   const license = await licenseService.removeFromBlacklist(id, updatedBy);

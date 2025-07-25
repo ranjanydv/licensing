@@ -4,6 +4,7 @@ import { licenseService } from '../services/license.service';
 import { validate, licenseRequestSchema, licenseUpdateSchema, licenseValidationSchema } from '../utils/validation';
 import { LicenseRequest } from '../interfaces/license.interface';
 import { Logger } from '../utils/logger';
+import { AuthRequest } from '@/interfaces/auth.interface';
 
 const logger = new Logger('LicenseController');
 
@@ -11,14 +12,14 @@ const logger = new Logger('LicenseController');
  * Generate a new license
  * @route POST /api/licenses
  */
-export const generateLicense = catchAsync(async (req: Request, res: Response) => {
+export const generateLicense = catchAsync(async (req: AuthRequest, res: Response) => {
     try {
         // Validate request body
         const licenseData = validate(licenseRequestSchema, req.body) as LicenseRequest;
 
         // Set createdBy from authenticated user (if not provided)
         if (!licenseData.createdBy) {
-            licenseData.createdBy = req.body.userId || 'system';
+            licenseData.createdBy = req.user?.id || 'system';
         }
         // Generate license
         const license = await licenseService.generateLicense(licenseData);
@@ -52,7 +53,7 @@ export const generateLicense = catchAsync(async (req: Request, res: Response) =>
  * Get all licenses
  * @route GET /api/licenses
  */
-export const getLicenses = catchAsync(async (req: Request, res: Response) => {
+export const getLicenses = catchAsync(async (req: AuthRequest, res: Response) => {
     const { status, schoolId, page = 1, limit = 20, search } = req.query;
 
     // Build filter object
@@ -114,14 +115,14 @@ export const getLicenseById = catchAsync(async (req: Request, res: Response) => 
  * Update license
  * @route PUT /api/licenses/:id
  */
-export const updateLicense = catchAsync(async (req: Request, res: Response) => {
+export const updateLicense = catchAsync(async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
 
     // Validate request body
     const updateData = validate(licenseUpdateSchema, req.body);
 
     // Get updatedBy from authenticated user
-    const updatedBy = req.body.userId || 'system';
+    const updatedBy = req.user?.id || 'system';
 
     // Update license
     const license = await licenseService.updateLicense(id, updateData as Partial<LicenseRequest>, updatedBy);
@@ -144,11 +145,11 @@ export const updateLicense = catchAsync(async (req: Request, res: Response) => {
  * Revoke license
  * @route DELETE /api/licenses/:id
  */
-export const revokeLicense = catchAsync(async (req: Request, res: Response) => {
+export const revokeLicense = catchAsync(async (req: AuthRequest, res: Response) => {
     const { id } = req.params;
 
     // Get updatedBy from authenticated user
-    const updatedBy = req.body.userId || 'system';
+    const updatedBy = req.user?.id || 'system';
 
     // Revoke license
     const result = await licenseService.revokeLicense(id, updatedBy);
@@ -201,8 +202,8 @@ export const validateLicense = catchAsync(async (req: Request, res: Response) =>
 * Transfer license to a different school
  * @route POST /api/licenses/:id/transfer
  */
-export const transferLicense = catchAsync(async (req: Request, res: Response) => {
-    const { id } = req.params;
+export const transferLicense = catchAsync(async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;  
     const { newSchoolId, newSchoolName } = req.body;
 
     // Validate required fields
@@ -211,7 +212,7 @@ export const transferLicense = catchAsync(async (req: Request, res: Response) =>
     }
 
     // Get updatedBy from authenticated user
-    const updatedBy = req.body.userId || 'system';
+    const updatedBy = req.user?.id || 'system';
 
     // Transfer license
     const license = await licenseService.transferLicense(id, newSchoolId, newSchoolName, updatedBy);

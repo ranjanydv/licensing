@@ -128,7 +128,6 @@ router.post('/validate', licenseValidationLimiter, validateLicense);
  *         $ref: '#/components/responses/TooManyRequestsError'
  */
 router.post('/', authenticate, authorize(['admin']), licenseGenerationLimiter, generateLicense);
-// router.post('/', licenseGenerationLimiter, generateLicense);
 
 /**
  * @swagger
@@ -175,8 +174,7 @@ router.post('/', authenticate, authorize(['admin']), licenseGenerationLimiter, g
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  */
-// router.get('/', authenticate, authorize(['admin', 'support']), getLicenses);
-router.get('/', getLicenses);
+router.get('/', authenticate, authorize(['admin', 'support']), getLicenses);
 
 /**
  * @swagger
@@ -215,8 +213,7 @@ router.get('/', getLicenses);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-// router.get('/:id', authenticate, authorize(['admin', 'support']), getLicenseById);
-router.get('/:id', getLicenseById);
+router.get('/:id', authenticate, authorize(['admin', 'support']), getLicenseById);
 
 /**
  * @swagger
@@ -311,8 +308,7 @@ router.put('/:id', authenticate, authorize(['admin']), updateLicense);
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-// router.delete('/:id', authenticate, authorize(['admin']), revokeLicense);
-router.delete('/:id',  revokeLicense);
+router.delete('/:id', authenticate, authorize(['admin']), revokeLicense);
 
 /**
  * @swagger
