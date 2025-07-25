@@ -228,6 +228,9 @@ export class LicenseService implements ILicenseService {
       if (checkRevocation && license.blacklisted) {
         return { valid: false, errors: ['License is blacklisted', license.blacklistReason || ''] };
       }
+      // Update Last Checked Value
+      // license.lastChecked = new Date();
+      await licenseRepository.update(license._id.toString(), { lastChecked: new Date() });
       // All checks passed
       return {
         valid: true,
