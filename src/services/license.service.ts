@@ -1072,13 +1072,7 @@ export class LicenseService implements ILicenseService {
       this.logger.info('Checking blacklist status', { licenseIdOrKey: licenseIdOrKey.substring(0, 10) + '...' });
 
       // Try to find by ID first
-      let license = await licenseRepository.findById(licenseIdOrKey);
-
-      // If not found by ID, try by license key
-      if (!license) {
-        license = await licenseRepository.findByLicenseKey(licenseIdOrKey);
-      }
-
+      const license = await licenseRepository.findById(licenseIdOrKey);
       // If license not found, return not blacklisted
       if (!license) {
         return { blacklisted: false };

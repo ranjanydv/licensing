@@ -8,3 +8,6 @@ dist
 coverage
 .kiro/*
 .kiro
+
+# logs
+logs/*

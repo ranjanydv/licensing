@@ -2,9 +2,20 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import app from './app';
 import { Logger } from './utils/logger';
+import fs from 'fs';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
+
+// Set up log file with timestamp
+const logsDir = path.join(__dirname, '../logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir);
+}
+const logFileName = `server-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+const logFilePath = path.join(logsDir, logFileName);
+Logger.setLogFilePath(logFilePath);
 
 const logger = new Logger('Server');
 

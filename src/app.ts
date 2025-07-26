@@ -1,19 +1,17 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
 import compression from 'compression';
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
+import { csrfProtection, setCsrfHeaders } from './middlewares/csrfMiddleware';
 import { errorHandler, notFoundHandler } from './middlewares/errorHandler';
 import { apiLimiter } from './middlewares/rateLimiter';
-import { csrfProtection, setCsrfHeaders } from './middlewares/csrfMiddleware';
 
 // Import routes
 import authRoutes from './routes/authRoutes';
-import userRoutes from './routes/userRoutes';
-import roleRoutes from './routes/roleRoutes';
 import licenseRoutes from './routes/licenseRoutes';
-import analyticsRoutes from './routes/analytics.routes';
-import featureRoutes from './routes/feature.routes';
+import roleRoutes from './routes/roleRoutes';
 import securityRoutes from './routes/securityRoutes';
+import userRoutes from './routes/userRoutes';
 
 const app = express();
 
@@ -72,8 +70,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/licenses', licenseRoutes);
-app.use('/api/features', featureRoutes);
-app.use('/api/analytics', analyticsRoutes);
+// app.use('/api/features', featureRoutes); //? Features Validation
+// app.use('/api/analytics', analyticsRoutes); //? Analytics of used Features
 app.use('/api/licenses', securityRoutes); // Add security routes under the licenses path
 
 // Health check endpoint

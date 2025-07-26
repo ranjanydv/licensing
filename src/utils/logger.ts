@@ -1,9 +1,22 @@
 import winston from 'winston';
+import fs from 'fs';
+import path from 'path';
 /**
  * Simple logger utility
  */
 export class Logger {
 	private context: string;
+	private static logFilePath: string | null = null;
+
+	/**
+	 * Set the log file path for this server run
+	 * @param filePath Path to the log file
+	 */
+	static setLogFilePath(filePath: string) {
+		Logger.logFilePath = filePath;
+		// Reset the singleton winston logger so it uses the new file
+		(Logger as any)._winstonLogger = null;
+	}
 
 	/**
 	 * Create a new logger
@@ -65,26 +78,27 @@ export class Logger {
 			...meta
 		};
 
-		// Use winston for real logging
-		// You may need to install winston: npm install winston
-
-		// Create a singleton logger instance if not already created
-
-			// Ensure a singleton winston logger instance on the Logger class
-			if (!(Logger as any)._winstonLogger) {
-				(Logger as any)._winstonLogger = winston.createLogger({
-					level: 'info',
-					format: winston.format.combine(
-						winston.format.timestamp(),
-						winston.format.json()
-					),
-					transports: [
-						new winston.transports.Console()
-					]
-				});
+		// Ensure a singleton winston logger instance on the Logger class
+		if (!(Logger as any)._winstonLogger) {
+			// Use the base winston Transport type for the array
+			const transports: winston.transport[] = [
+				new winston.transports.Console()
+			];
+			if (Logger.logFilePath) {
+				transports.push(
+					new winston.transports.File({ filename: Logger.logFilePath, format: winston.format.simple() })
+				);
 			}
-			const winstonLogger = (Logger as any)._winstonLogger;
-
-			winstonLogger.log(logData);
+			(Logger as any)._winstonLogger = winston.createLogger({
+				level: 'info',
+				format: winston.format.combine(
+					winston.format.timestamp(),
+					winston.format.json()
+				),
+				transports
+			});
+		}
+		const winstonLogger = (Logger as any)._winstonLogger;
+		winstonLogger.log(logData);
 	}
 }
