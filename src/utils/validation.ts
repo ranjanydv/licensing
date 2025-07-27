@@ -36,7 +36,7 @@ export const licenseUpdateSchema = z.object({
     LicenseStatus.PENDING
   ]).optional(),
   metadata: z.record(z.any()).optional(),
-  updatedBy: z.string().min(1, 'Updated by is required')
+  updatedBy: z.string().optional()
 });
 
 /**

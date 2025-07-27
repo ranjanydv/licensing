@@ -214,6 +214,7 @@ export const transferLicense = catchAsync(async (req: AuthRequest, res: Response
     // Get updatedBy from authenticated user
     const updatedBy = req.user?.id || 'system';
 
+
     // Transfer license
     const license = await licenseService.transferLicense(id, newSchoolId, newSchoolName, updatedBy);
 

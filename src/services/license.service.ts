@@ -294,21 +294,42 @@ export class LicenseService implements ILicenseService {
         updatedBy
       };
 
-      // If features are updated, update the license key
-      if (data.features) {
-        // Calculate expiration date if duration is provided
-        let expiresAt = existingLicense.expiresAt;
-        if (data.duration) {
-          expiresAt = new Date();
+      // Calculate new expiration date if duration is provided
+      let expiresAt = existingLicense.expiresAt;
+      if (data.duration) {
+        const now = new Date();
+        
+        // If license has expired or is expired status, start from current date
+        if (existingLicense.expiresAt < now || existingLicense.status === LicenseStatus.EXPIRED) {
+          expiresAt = new Date(now);
           expiresAt.setDate(expiresAt.getDate() + data.duration);
-          updateData.expiresAt = expiresAt;
+        } else {
+          // If license is still active, extend from current expiration date
+          expiresAt = new Date(existingLicense.expiresAt);
+          expiresAt.setDate(expiresAt.getDate() + data.duration);
         }
+        updateData.expiresAt = expiresAt;
+        
+        // If license was expired and we're extending it, set status back to ACTIVE
+        if (existingLicense.status === LicenseStatus.EXPIRED) {
+          updateData.status = LicenseStatus.ACTIVE;
+          this.logger.info('License was expired, setting status back to ACTIVE', { 
+            licenseId: id, 
+            oldExpiry: existingLicense.expiresAt,
+            newExpiry: expiresAt 
+          });
+        }
+      }
 
+      // Check if we need to regenerate JWT token (when features or expiration changes)
+      const needsTokenRegeneration = data.features || data.duration;
+
+      if (needsTokenRegeneration) {
         // Create updated license data for hash generation
         const licenseDataForHash: Partial<License> = {
           schoolId: data.schoolId || existingLicense.schoolId,
           schoolName: data.schoolName || existingLicense.schoolName,
-          features: data.features,
+          features: data.features || existingLicense.features,
           issuedAt: existingLicense.issuedAt,
           expiresAt
         };
@@ -324,14 +345,22 @@ export class LicenseService implements ILicenseService {
           iat: Math.floor(existingLicense.issuedAt.getTime() / 1000),
           exp: Math.floor(expiresAt.getTime() / 1000),
           schoolName: data.schoolName || existingLicense.schoolName,
-          features: data.features.map(f => f.name),
+          features: (data.features || existingLicense.features).map(f => f.name),
           licenseId: existingLicense._id.toString(),
-          metadata: data.metadata || existingLicense.metadata
+          metadata: data.metadata || existingLicense.metadata,
+          securityInfo: {
+            hardwareBindingEnabled: data.securityRestrictions?.hardwareBinding?.enabled || 
+              existingLicense.securityRestrictions?.hardwareBinding?.enabled || false,
+            ipRestrictionsEnabled: data.securityRestrictions?.ipRestrictions?.enabled || 
+              existingLicense.securityRestrictions?.ipRestrictions?.enabled || false,
+            deviceLimitEnabled: data.securityRestrictions?.deviceLimit?.enabled || 
+              existingLicense.securityRestrictions?.deviceLimit?.enabled || false
+          }
         };
 
         // Generate new JWT token
-        const licenseKey = generateToken(jwtPayload);
-        updateData.licenseKey = licenseKey;
+        const licenseToken = generateToken(jwtPayload);
+        updateData.licenseToken = licenseToken;
       }
 
       // Update license
@@ -583,12 +612,12 @@ export class LicenseService implements ILicenseService {
       };
 
       // Generate new JWT token
-      const licenseKey = generateToken(jwtPayload);
+      const licenseToken = generateToken(jwtPayload);
 
       // Update license
       const updatedLicense = await licenseRepository.update(id, {
         expiresAt,
-        licenseKey,
+        licenseToken,
         licenseHash,
         status: LicenseStatus.ACTIVE,
         updatedBy
@@ -685,13 +714,13 @@ export class LicenseService implements ILicenseService {
       };
 
       // Generate new JWT token
-      const licenseKey = generateToken(jwtPayload);
+      const licenseToken = generateToken(jwtPayload);
 
       // Prepare update data
       const updateData = {
         schoolId: newSchoolId,
         schoolName: newSchoolName,
-        licenseKey,
+        licenseToken,
         licenseHash,
         updatedBy,
         updatedAt: new Date()
@@ -714,7 +743,7 @@ export class LicenseService implements ILicenseService {
         {
           schoolId: newSchoolId,
           schoolName: newSchoolName,
-          licenseKey: licenseKey.substring(0, 10) + '...' // Only log part of the key for security
+          licenseKey: licenseToken.substring(0, 10) + '...' // Only log part of the key for security
         },
         {
           transferTimestamp: new Date(),
