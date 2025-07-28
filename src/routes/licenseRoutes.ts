@@ -7,7 +7,7 @@ import {
   revokeLicense,
   validateLicense,
   transferLicense
-} from '../controllers/licenseController';
+} from '../controllers/license.controller';
 import { licenseValidationLimiter, licenseGenerationLimiter } from '../middlewares/rateLimiter';
 import { authenticate } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/authorizationMiddleware';

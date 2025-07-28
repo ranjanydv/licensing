@@ -7,7 +7,7 @@ import {
   blacklistLicense,
   removeFromBlacklist,
   checkBlacklistStatus
-} from '../controllers/securityController';
+} from '../controllers/security.controller';
 import { authenticate } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/authorizationMiddleware';
 
