@@ -77,9 +77,7 @@ export const getLicenses = catchAsync(async (req: AuthRequest, res: Response) =>
     res.status(200).json({
         status: 'success',
         results: licenses.length,
-        data: {
-            licenses
-        },
+        data: { licenses },
         page: pageNum,
         limit: limitNum,
         total,
@@ -203,7 +201,7 @@ export const validateLicense = catchAsync(async (req: Request, res: Response) =>
  * @route POST /api/licenses/:id/transfer
  */
 export const transferLicense = catchAsync(async (req: AuthRequest, res: Response) => {
-    const { id } = req.params;  
+    const { id } = req.params;
     const { newSchoolId, newSchoolName } = req.body;
 
     // Validate required fields
