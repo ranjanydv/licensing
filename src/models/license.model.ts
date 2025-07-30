@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { License, LicenseStatus, Feature } from '../interfaces/license.interface';
+import { License, LicenseStatus, Feature, ActivationStatus } from '../interfaces/license.interface';
 
 /**
  * Feature schema for MongoDB
@@ -20,70 +20,6 @@ const FeatureSchema = new Schema<Feature>({
 }, { _id: false });
 
 /**
- * Hardware binding schema for MongoDB
- */
-const HardwareBindingSchema = new Schema({
-	enabled: {
-		type: Boolean,
-		default: false
-	},
-	fingerprints: {
-		type: [String],
-		default: []
-	}
-}, { _id: false });
-
-/**
- * IP restrictions schema for MongoDB
- */
-const IpRestrictionsSchema = new Schema({
-	enabled: {
-		type: Boolean,
-		default: false
-	},
-	allowedIps: {
-		type: [String],
-		default: []
-	},
-	allowedCountries: {
-		type: [String],
-		default: []
-	}
-}, { _id: false });
-
-/**
- * Device limit schema for MongoDB
- */
-const DeviceLimitSchema = new Schema({
-	enabled: {
-		type: Boolean,
-		default: false
-	},
-	maxDevices: {
-		type: Number,
-		default: 1
-	}
-}, { _id: false });
-
-/**
- * Security restrictions schema for MongoDB
- */
-const SecurityRestrictionsSchema = new Schema({
-	hardwareBinding: {
-		type: HardwareBindingSchema,
-		default: () => ({})
-	},
-	ipRestrictions: {
-		type: IpRestrictionsSchema,
-		default: () => ({})
-	},
-	deviceLimit: {
-		type: DeviceLimitSchema,
-		default: () => ({})
-	}
-}, { _id: false });
-
-/**
  * License schema for MongoDB with optimized indexes
  */
 const LicenseSchema = new Schema<License & Document>({
@@ -99,55 +35,54 @@ const LicenseSchema = new Schema<License & Document>({
 	licenseKey: {
 		type: String,
 		required: true,
+		index: true,
+		unique: true
+	},
+	licenseHex: {
+		type: String,
+		unique: true,
+		sparse: true,
 		index: true
-	},
-	licenseToken: {
-		type: String,
-		required: true,
-	},
-	licenseHash: {
-		type: String,
-		required: true
 	},
 	features: [FeatureSchema],
 	issuedAt: {
 		type: Date,
 		default: Date.now,
-		index: true // Index for sorting by issue date
+		index: true
 	},
 	expiresAt: {
 		type: Date,
 		required: true,
 		index: true
 	},
-	lastChecked: {
+	activatedAt: {
 		type: Date,
-		default: Date.now
+		index: true
+	},
+	lastVerificationAt: {
+		type: Date,
+		index: true
+	},
+	activationStatus: {
+		type: String,
+		enum: Object.values(ActivationStatus),
+		default: ActivationStatus.PENDING,
+		index: true
+	},
+	activationAttempts: {
+		type: Number,
+		default: 0,
+		index: true
 	},
 	status: {
 		type: String,
 		enum: Object.values(LicenseStatus),
-		default: LicenseStatus.ACTIVE,
+		default: LicenseStatus.PENDING,
 		index: true
 	},
 	metadata: {
 		type: Schema.Types.Mixed,
 		default: {}
-	},
-	securityRestrictions: {
-		type: SecurityRestrictionsSchema,
-		default: () => ({})
-	},
-	fingerprint: {
-		type: String
-	},
-	blacklisted: {
-		type: Boolean,
-		default: false,
-		index: true
-	},
-	blacklistReason: {
-		type: String
 	},
 	createdBy: {
 		type: String,
@@ -168,14 +103,13 @@ const LicenseSchema = new Schema<License & Document>({
 	}
 });
 
-// Compound indexes for performance optimization
-LicenseSchema.index({ schoolId: 1, status: 1 }); // For finding active licenses by school
-LicenseSchema.index({ expiresAt: 1, status: 1 }); // For finding expired or expiring licenses
+// Updated compound indexes for performance optimization
+LicenseSchema.index({ schoolId: 1, activationStatus: 1 }); // For finding active licenses by school
+LicenseSchema.index({ expiresAt: 1, activationStatus: 1 }); // For finding expired or expiring licenses
+LicenseSchema.index({ activationStatus: 1, status: 1 }); // For filtering by activation and status
+LicenseSchema.index({ lastVerificationAt: 1, activationStatus: 1 }); // For verification tracking
 LicenseSchema.index({ createdAt: -1 }); // For sorting by creation date (newest first)
 LicenseSchema.index({ updatedAt: -1 }); // For sorting by update date (newest first)
-LicenseSchema.index({ blacklisted: 1, status: 1 }); // For finding blacklisted active licenses
-LicenseSchema.index({ 'securityRestrictions.hardwareBinding.enabled': 1 }); // For filtering by hardware binding
-LicenseSchema.index({ 'securityRestrictions.ipRestrictions.enabled': 1 }); // For filtering by IP restrictions
 
 // Virtual for checking if license is expired
 LicenseSchema.virtual('isExpired').get(function (this: License & Document) {
@@ -192,8 +126,8 @@ LicenseSchema.virtual('daysUntilExpiration').get(function (this: License & Docum
 
 // Pre-save hook to update status based on expiration
 LicenseSchema.pre('save', function (this: License & Document, next) {
-	if (this.expiresAt < new Date() && this.status === LicenseStatus.ACTIVE) {
-		this.status = LicenseStatus.EXPIRED;
+	if (this.expiresAt < new Date() && this.activationStatus === ActivationStatus.ACTIVATED) {
+		this.activationStatus = ActivationStatus.EXPIRED;
 	}
 	next();
 });

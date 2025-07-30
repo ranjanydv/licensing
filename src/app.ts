@@ -10,7 +10,7 @@ import { apiLimiter } from './middlewares/rateLimiter';
 import authRoutes from './routes/authRoutes';
 import licenseRoutes from './routes/licenseRoutes';
 import roleRoutes from './routes/roleRoutes';
-import securityRoutes from './routes/securityRoutes';
+// import securityRoutes from './routes/securityRoutes';
 import userRoutes from './routes/userRoutes';
 
 const app = express();
@@ -72,7 +72,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/licenses', licenseRoutes);
 // app.use('/api/features', featureRoutes); //? Features Validation
 // app.use('/api/analytics', analyticsRoutes); //? Analytics of used Features
-app.use('/api/licenses', securityRoutes); // Add security routes under the licenses path
+// app.use('/api/licenses', securityRoutes); // Add security routes under the licenses path
 
 // Health check endpoint
 app.get('/health', (req, res) => {

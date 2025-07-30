@@ -5,10 +5,10 @@ import {
   getLicenseById,
   updateLicense,
   revokeLicense,
-  validateLicense,
   transferLicense
 } from '../controllers/license.controller';
-import { licenseValidationLimiter, licenseGenerationLimiter } from '../middlewares/rateLimiter';
+import { activateLicense, validateLicenseHex } from '../controllers/licenseActivation.controller';
+import { licenseActivationLimiter, licenseGenerationLimiter, hexValidationLimiter } from '../middlewares/rateLimiter';
 import { authenticate } from '../middlewares/authMiddleware';
 import { authorize } from '../middlewares/authorizationMiddleware';
 
@@ -16,10 +16,10 @@ const router = express.Router();
 
 /**
  * @swagger
- * /licenses/validate:
+ * /licenses/activate:
  *   post:
- *     summary: Validate a license
- *     description: Validates a license key against the system
+ *     summary: Activate a license
+ *     description: Activates a license with license key and schoolId, returns hex
  *     tags: [Licenses]
  *     requestBody:
  *       required: true
@@ -33,13 +33,69 @@ const router = express.Router();
  *             properties:
  *               licenseKey:
  *                 type: string
- *                 description: The license key to validate
+ *                 description: The license key to activate
  *               schoolId:
  *                 type: string
  *                 description: The school ID associated with the license
  *     responses:
  *       200:
- *         description: License is valid
+ *         description: License activated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     licenseHex:
+ *                       type: string
+ *                       description: Generated license hex
+ *                     expiresAt:
+ *                       type: string
+ *                       format: date-time
+ *                     features:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     message:
+ *                       type: string
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
+ *       429:
+ *         $ref: '#/components/responses/TooManyRequestsError'
+ */
+router.post('/activate', licenseActivationLimiter, activateLicense);
+
+/**
+ * @swagger
+ * /licenses/validate-hex:
+ *   post:
+ *     summary: Validate license hex
+ *     description: Validates a license hex for school ERP
+ *     tags: [Licenses]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - licenseHex
+ *               - schoolId
+ *             properties:
+ *               licenseHex:
+ *                 type: string
+ *                 description: The license hex to validate
+ *               schoolId:
+ *                 type: string
+ *                 description: The school ID
+ *     responses:
+ *       200:
+ *         description: Hex validation result
  *         content:
  *           application/json:
  *             schema:
@@ -62,32 +118,14 @@ const router = express.Router();
  *                       type: array
  *                       items:
  *                         type: string
- *                       example: ["attendance", "gradebook", "reports"]
- *       401:
- *         description: License is invalid
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: error
- *                 data:
- *                   type: object
- *                   properties:
- *                     valid:
- *                       type: boolean
- *                       example: false
- *                     errors:
- *                       type: array
- *                       items:
- *                         type: string
- *                       example: ["License has expired", "School ID does not match"]
+ *                     message:
+ *                       type: string
+ *       400:
+ *         $ref: '#/components/responses/BadRequestError'
  *       429:
  *         $ref: '#/components/responses/TooManyRequestsError'
  */
-router.post('/validate', licenseValidationLimiter, validateLicense);
+router.post('/validate-hex', hexValidationLimiter, validateLicenseHex);
 
 /**
  * @swagger

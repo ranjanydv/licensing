@@ -9,6 +9,15 @@ export enum LicenseStatus {
 }
 
 /**
+ * License activation status enum
+ */
+export enum ActivationStatus {
+	PENDING = 'pending',
+	ACTIVATED = 'activated',
+	EXPIRED = 'expired'
+}
+
+/**
  * Feature interface for license features
  */
 export interface Feature {
@@ -18,22 +27,39 @@ export interface Feature {
 }
 
 /**
- * Security restrictions interface for license
+ * License activation request interface
  */
-export interface SecurityRestrictions {
-	hardwareBinding?: {
-		enabled: boolean;
-		fingerprints: string[]; // List of allowed hardware fingerprints
-	};
-	ipRestrictions?: {
-		enabled: boolean;
-		allowedIps: string[]; // List of allowed IP addresses or CIDR ranges
-		allowedCountries?: string[]; // List of allowed country codes
-	};
-	deviceLimit?: {
-		enabled: boolean;
-		maxDevices: number; // Maximum number of devices that can use this license
-	};
+export interface ActivationRequest {
+	licenseKey: string;
+	schoolId: string;
+}
+
+/**
+ * License activation response interface
+ */
+export interface ActivationResponse {
+	licenseHex: string;
+	expiresAt: Date;
+	features: string[];
+	message: string;
+}
+
+/**
+ * License hex validation request interface
+ */
+export interface HexValidationRequest {
+	licenseHex: string;
+	schoolId: string;
+}
+
+/**
+ * License hex validation response interface
+ */
+export interface HexValidationResponse {
+	valid: boolean;
+	expiresIn?: number; // days until expiration
+	features?: string[];
+	message: string;
 }
 
 /**
@@ -43,19 +69,17 @@ export interface License {
 	_id: string;
 	schoolId: string;
 	schoolName: string;
-	licenseKey: string; // Short, random, public-facing license key (e.g., UUID or base62 string)
-	licenseToken: string; // JWT or secure token for internal validation
-	licenseHash: string; // Additional hash for verification
+	licenseKey: string; // Short, random, public-facing license key
+	licenseHex?: string; // Generated hex for ERP storage
 	features: Feature[];
 	issuedAt: Date;
 	expiresAt: Date;
-	lastChecked: Date;
+	activatedAt?: Date; // Activation timestamp
+	lastVerificationAt?: Date; // Last hex validation timestamp
+	activationStatus: ActivationStatus; // New field
+	activationAttempts: number; // Track failed attempts
 	status: LicenseStatus;
 	metadata: Record<string, any>;
-	securityRestrictions?: SecurityRestrictions; // Security restrictions
-	fingerprint?: string; // License fingerprint for tamper detection
-	blacklisted?: boolean; // Whether the license is blacklisted
-	blacklistReason?: string; // Reason for blacklisting
 	createdBy: string;
 	updatedBy: string;
 	createdAt: Date;
@@ -71,12 +95,11 @@ export interface LicenseRequest {
 	duration: number; // in days
 	features: Feature[];
 	metadata?: Record<string, any>;
-	securityRestrictions?: SecurityRestrictions; // Security restrictions
 	createdBy?: string;
 }
 
 /**
- * License validation result interface
+ * License validation result interface (for backward compatibility)
  */
 export interface ValidationResult {
 	valid: boolean;
@@ -86,7 +109,7 @@ export interface ValidationResult {
 }
 
 /**
- * License check report interface
+ * License check report interface (for backward compatibility)
  */
 export interface LicenseCheckReport {
 	totalChecked: number;
@@ -103,7 +126,7 @@ export interface LicenseCheckReport {
 }
 
 /**
- * JWT payload interface
+ * JWT payload interface (kept for backward compatibility)
  */
 export interface JWTPayload {
 	sub: string; // Subject (schoolId)
@@ -114,10 +137,4 @@ export interface JWTPayload {
 	features: string[]; // Feature names only
 	licenseId: string;
 	metadata: Record<string, any>;
-	securityInfo?: {
-		hardwareBindingEnabled?: boolean;
-		ipRestrictionsEnabled?: boolean;
-		deviceLimitEnabled?: boolean;
-		fingerprint?: string; // License fingerprint
-	};
 }

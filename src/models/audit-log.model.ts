@@ -12,7 +12,8 @@ export enum AuditActionType {
   TRANSFER = 'transfer',
   BLACKLIST = 'blacklist',
   UNBLACKLIST = 'unblacklist',
-  SECURITY_UPDATE = 'security_update'
+  SECURITY_UPDATE = 'security_update',
+  ACTIVATE = 'activate'
 }
 
 /**

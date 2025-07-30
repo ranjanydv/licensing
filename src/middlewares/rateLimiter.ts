@@ -36,7 +36,27 @@ export const createRateLimiter = (
 };
 
 /**
- * Rate limiter for license validation endpoint
+ * Rate limiter for license activation endpoint
+ * Strict limits to prevent brute force attacks
+ */
+export const licenseActivationLimiter = createRateLimiter(
+	10,
+	1,
+	'Too many license activation attempts, please try again later'
+);
+
+/**
+ * Rate limiter for license hex validation endpoint
+ * Higher limits since this is called frequently by ERP systems
+ */
+export const hexValidationLimiter = createRateLimiter(
+	60,
+	1,
+	'Too many hex validation attempts, please try again later'
+);
+
+/**
+ * Rate limiter for license validation endpoint (for backward compatibility)
  * More strict limits to prevent brute force attacks
  */
 export const licenseValidationLimiter = createRateLimiter(

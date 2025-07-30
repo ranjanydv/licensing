@@ -40,7 +40,23 @@ export const licenseUpdateSchema = z.object({
 });
 
 /**
- * License validation request schema
+ * License activation request schema
+ */
+export const activationRequestSchema = z.object({
+  licenseKey: z.string().min(8, 'License key must be at least 8 characters').max(50, 'License key must be at most 50 characters'),
+  schoolId: z.string().min(1, 'School ID is required').max(100, 'School ID must be at most 100 characters')
+});
+
+/**
+ * License hex validation request schema
+ */
+export const hexValidationRequestSchema = z.object({
+  licenseHex: z.string().regex(/^[a-f0-9]{32,64}-[a-f0-9]{8,}-[a-z0-9]+-[a-f0-9]{8}$/i, 'License hex must be in format: hash(32-64)-licenseId(8+)-timestamp-random(8)'),
+  schoolId: z.string().min(1, 'School ID is required').max(100, 'School ID must be at most 100 characters')
+});
+
+/**
+ * License validation request schema (for backward compatibility)
  */
 export const licenseValidationSchema = z.object({
   licenseKey: z.string().min(1, 'License key is required'),

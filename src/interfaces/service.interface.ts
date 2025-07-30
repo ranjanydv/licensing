@@ -1,6 +1,5 @@
 import { License, LicenseRequest, ValidationResult, LicenseCheckReport } from './license.interface';
 import { FeatureValidationResult } from '../utils/featureValidation';
-import { ClientInfo, HardwareInfo } from '../utils/security';
 
 /**
  * License service interface
@@ -54,6 +53,7 @@ export interface ILicenseService {
     featureNames: string[],
     context?: Record<string, any>
   ): FeatureValidationResult[];
+  
   /**
    * Generate a new license
    * @param licenseData License request data
@@ -63,13 +63,11 @@ export interface ILicenseService {
   
   /**
    * Validate a license
-   * @param licenseKey License key (JWT token)
+   * @param licenseKey License key
    * @param schoolId School ID
-   * @param checkRevocation Whether to check revocation status
-   * @param clientInfo Client information for security validation
    * @returns Validation result
    */
-  validateLicense(licenseKey: string, schoolId: string, checkRevocation?: boolean, clientInfo?: ClientInfo): Promise<ValidationResult>;
+  validateLicense(licenseKey: string, schoolId: string): Promise<ValidationResult>;
   
   /**
    * Get a license by ID
@@ -133,73 +131,4 @@ export interface ILicenseService {
    * @returns Transferred license or null if not found
    */
   transferLicense(id: string, newSchoolId: string, newSchoolName: string, updatedBy: string): Promise<License | null>;
-  
-  /**
-   * Register a hardware fingerprint for a license
-   * @param licenseId License ID
-   * @param hardwareInfo Hardware information
-   * @returns Updated license or null if not found
-   */
-  registerHardwareFingerprint(licenseId: string, hardwareInfo: HardwareInfo): Promise<License | null>;
-  
-  /**
-   * Remove a hardware fingerprint from a license
-   * @param licenseId License ID
-   * @param fingerprint Hardware fingerprint to remove
-   * @returns Updated license or null if not found
-   */
-  removeHardwareFingerprint(licenseId: string, fingerprint: string): Promise<License | null>;
-  
-  /**
-   * Update IP restrictions for a license
-   * @param licenseId License ID
-   * @param ipRestrictions IP restrictions
-   * @returns Updated license or null if not found
-   */
-  updateIpRestrictions(
-    licenseId: string, 
-    ipRestrictions: { enabled: boolean; allowedIps: string[]; allowedCountries?: string[] }
-  ): Promise<License | null>;
-  
-  /**
-   * Update device limit for a license
-   * @param licenseId License ID
-   * @param deviceLimit Device limit
-   * @returns Updated license or null if not found
-   */
-  updateDeviceLimit(
-    licenseId: string, 
-    deviceLimit: { enabled: boolean; maxDevices: number }
-  ): Promise<License | null>;
-  
-  /**
-   * Get device count for a license
-   * @param licenseId License ID
-   * @returns Number of devices using this license
-   */
-  getDeviceCountForLicense(licenseId: string): Promise<number>;
-  
-  /**
-   * Blacklist a license
-   * @param licenseId License ID
-   * @param reason Reason for blacklisting
-   * @param updatedBy User who blacklisted the license
-   * @returns Updated license or null if not found
-   */
-  blacklistLicense(licenseId: string, reason: string, updatedBy: string): Promise<License | null>;
-  
-  /**
-   * Remove a license from the blacklist
-   * @param licenseId License ID
-   * @param updatedBy User who removed the license from the blacklist
-   * @returns Updated license or null if not found
-   */
-  removeFromBlacklist(licenseId: string, updatedBy: string): Promise<License | null>;
-  
-  /**
-   * Check if a license is blacklisted
-   * @param licenseIdOrKey License ID or license key
-   * @returns Boolean indicating if license is blacklisted and reason if available
-   */
-  checkBlacklist(licenseIdOrKey: string): Promise<{ blacklisted: boolean; reason?: string }>;
 }
